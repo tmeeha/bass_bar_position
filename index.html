@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}</style>
+<title>Bass Bar Gap Calculator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: shop tool. Inputs left, corrected gap and cross-section right; class values tucked into a settings drawer. */
+:root{
+  --bg:#EDEFEA;--surface:#F8F9F5;--ink:#1D231F;--muted:#5C6660;--line:#CBD2CA;
+  --accent:#8A4A10;--accent-soft:#F1E3D2;--on-accent:#FFFFFF;
+  --wood:#E6D6B2;--wood-edge:#B59C6A;--bar:#CDB27E;--magnet:#56606B;--brass:#B48D27;--plastic:#7CA4C6;--dim:#2F5E7A;
+  --f-ui:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#131714;--surface:#1B201C;--ink:#E5E9E4;--muted:#9BA59E;--line:#323A34;
+  --accent:#E59B52;--accent-soft:#3A2A1A;--on-accent:#1B1209;
+  --wood:#5E5034;--wood-edge:#8C7650;--bar:#7E6B47;--magnet:#9AA4AF;--brass:#D1AE4C;--plastic:#86B1D6;--dim:#8EC3E4;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#131714;--surface:#1B201C;--ink:#E5E9E4;--muted:#9BA59E;--line:#323A34;
+  --accent:#E59B52;--accent-soft:#3A2A1A;--on-accent:#1B1209;
+  --wood:#5E5034;--wood-edge:#8C7650;--bar:#7E6B47;--magnet:#9AA4AF;--brass:#D1AE4C;--plastic:#86B1D6;--dim:#8EC3E4;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 48px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:24px}
+header h1{font-size:26px;font-weight:600;letter-spacing:-0.01em;margin:0;text-wrap:balance}
+header p{margin:4px 0 0;color:var(--muted);max-width:62ch}
+.grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:760px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.field{display:flex;flex-direction:column;gap:8px}
+.lbl{font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted)}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{padding:8px 4px;text-align:center;font-size:14px;cursor:pointer;border-left:1px solid var(--line);user-select:none;line-height:1.25}
+.seg label:first-of-type{border-left:none}
+.seg label small{display:block;font-family:var(--f-num);font-size:11px;color:var(--muted)}
+.seg input:checked+label{background:var(--accent);color:var(--on-accent)}
+.seg input:checked+label small{color:var(--on-accent);opacity:.85}
+.seg input:focus-visible+label{outline:2px solid var(--dim);outline-offset:-2px}
+.mrow{display:flex;align-items:center;gap:10px}
+.mrow input{font-family:var(--f-num);font-size:22px;width:120px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.mrow input:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
+.mrow span{color:var(--muted)}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.err{font-size:13px;color:#B3261E;margin:0}
+.result{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 32px}
+.big{font-family:var(--f-num);font-size:52px;font-weight:500;line-height:1;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+.big small{font-size:20px;color:var(--muted);margin-left:4px}
+.kv{display:grid;grid-template-columns:auto auto;gap:4px 16px;font-size:14px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-family:var(--f-num);font-variant-numeric:tabular-nums;text-align:right}
+.chip{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:999px;padding:2px 10px;font-size:13px;font-weight:500}
+.formula{font-family:var(--f-num);font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;overflow-x:auto;white-space:nowrap}
+.fig{overflow-x:auto}
+.fig svg{display:block;width:100%;height:auto;min-width:420px}
+.fig text{font-family:var(--f-ui);font-size:12px;fill:var(--muted)}
+.fig text.dimt{fill:var(--dim);font-family:var(--f-num);font-weight:500}
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 20px}
+summary{cursor:pointer;font-weight:600}
+summary:focus-visible{outline:2px solid var(--dim);outline-offset:2px}
+.tbl{overflow-x:auto;margin-top:14px}
+table{border-collapse:collapse;font-size:14px;min-width:620px}
+th,td{padding:6px 8px;text-align:left;border-bottom:1px solid var(--line)}
+th{font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;color:var(--muted)}
+td input{font-family:var(--f-num);width:64px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+.srow{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;margin-top:14px}
+.srow label{display:flex;gap:8px;align-items:center;font-size:14px}
+button{font:inherit;font-size:14px;padding:6px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--muted)}
+button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
+.note{font-size:13px;color:var(--muted);max-width:75ch;margin:10px 0 0}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Bass bar gap calculator</h1>
+    <p>Corrects the magnet reading (f-hole inner edge to the top disc's edge, measured along the surface at the mensur) to the true horizontal gap to the bass bar's outer edge.</p>
+  </header>
+
+  <div class="grid">
+    <form class="panel" id="form" autocomplete="off">
+      <div class="field">
+        <span class="lbl" id="l-inst">Instrument</span>
+        <div class="seg" role="radiogroup" aria-labelledby="l-inst" id="seg-inst"></div>
+      </div>
+      <div class="field">
+        <span class="lbl" id="l-arch">Arch class</span>
+        <div class="seg" role="radiogroup" aria-labelledby="l-arch" id="seg-arch"></div>
+      </div>
+      <div class="field">
+        <span class="lbl" id="l-thk">Top thickness at the island</span>
+        <div class="seg" role="radiogroup" aria-labelledby="l-thk" id="seg-thk"></div>
+      </div>
+      <div class="field">
+        <label class="lbl" for="m">Reading M, along the surface</label>
+        <div class="mrow"><input id="m" type="number" inputmode="decimal" step="0.1" min="0" value="17.0"><span>mm</span></div>
+        <p class="err" id="merr" hidden>Enter a reading above 0 mm.</p>
+        <p class="hint">Example value shown. Replace it with your measurement.</p>
+      </div>
+    </form>
+
+    <section class="panel" aria-live="polite">
+      <div class="result">
+        <div>
+          <div class="lbl">True horizontal gap</div>
+          <div class="big" id="g">–<small>mm</small></div>
+        </div>
+        <dl class="kv">
+          <dt>Correction</dt><dd id="corr">–</dd>
+          <dt>Angle used</dt><dd id="ang">–</dd>
+          <dt>Thickness used</dt><dd id="thk">–</dd>
+          <dt>Range, all classes</dt><dd id="rng">–</dd>
+        </dl>
+      </div>
+      <div class="formula" id="formula">–</div>
+      <div class="fig"><svg id="svg" viewBox="0 0 560 260" role="img" aria-label="Cross-section of the plate at the mensur showing the magnets, the reading M and the true gap"></svg></div>
+    </section>
+  </div>
+
+  <details id="settings">
+    <summary>Class values and disc settings</summary>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Instrument</th><th>Thin</th><th>Medium</th><th>Thick</th><th>Low arch</th><th>Medium arch</th><th>High arch</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="srow">
+      <label for="od">Top disc overhang minus bottom disc overhang <input id="od" type="number" step="0.1" value="0" style="width:72px;font-family:var(--f-num);padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)"> mm</label>
+      <button type="button" id="reset">Reset to defaults</button>
+    </div>
+    <p class="note">Thicknesses in mm, angles in degrees. Angles are the local slope between the f-hole and the bass bar, which is steeper than the average arch slope by about 1.35 on curtate cycloid cross-arches (Playfair, CASJ 2003; Mottola, Savart Journal 2011). Violin: your 11–15 mm underside rise over a 55 mm run. Bass: 32–45 mm outside arch height, assuming about 175 mm of run. Thicknesses are your island estimates: violin 2.5–4 mm, viola 2.8–4.3 mm, cello 3.5–5 mm, bass 6–9 mm. Changes are kept in this browser only.</p>
+  </details>
+</div>
+
+<script>
+const DEFAULTS={
+  violin:{name:"Violin",thk:[2.5,3.25,4.0],ang:[15,18,21]},
+  viola:{name:"Viola",thk:[2.8,3.55,4.3],ang:[16,18,20]},
+  cello:{name:"Cello",thk:[3.5,4.25,5.0],ang:[13,15,17]},
+  bass:{name:"Bass",thk:[6.0,7.5,9.0],ang:[11,13.5,16]}
+};
+const KEY="bbgap-v2";
+let cfg=JSON.parse(JSON.stringify(DEFAULTS)),od=0;
+try{const s=JSON.parse(localStorage.getItem(KEY)||"null");if(s&&s.cfg){cfg=s.cfg;od=+s.od||0}}catch(e){}
+const state={inst:"violin",arch:1,thk:1};
+const $=id=>document.getElementById(id);
+const ARCH=["Low","Medium","High"],THK=["Thin","Medium","Thick"];
+
+function seg(el,name,items,checked,onpick){
+  el.innerHTML=items.map((it,i)=>`<input type="radio" name="${name}" id="${name}-${i}" value="${i}" ${i===checked?"checked":""}><label for="${name}-${i}">${it.t}${it.s?`<small>${it.s}</small>`:""}</label>`).join("");
+  el.querySelectorAll("input").forEach(r=>r.addEventListener("change",()=>{onpick(+r.value);}));
+}
+const instKeys=Object.keys(cfg);
+function buildSegs(){
+  const c=cfg[state.inst];
+  seg($("seg-inst"),"inst",instKeys.map(k=>({t:cfg[k].name})),instKeys.indexOf(state.inst),i=>{state.inst=instKeys[i];buildSegs();calc()});
+  seg($("seg-arch"),"arch",ARCH.map((t,i)=>({t,s:c.ang[i]+"°"})),state.arch,i=>{state.arch=i;calc()});
+  seg($("seg-thk"),"thk",THK.map((t,i)=>({t,s:c.thk[i]+" mm"})),state.thk,i=>{state.thk=i;calc()});
+}
+function buildTable(){
+  $("tbody").innerHTML=instKeys.map(k=>{const c=cfg[k];
+    const cell=(f,i,step)=>`<td><input type="number" step="${step}" id="${k}-${f}-${i}" value="${c[f][i]}" aria-label="${c.name} ${f==="thk"?THK[i]+" thickness":ARCH[i]+" arch angle"}"></td>`;
+    return `<tr><td>${c.name}</td>${[0,1,2].map(i=>cell("thk",i,0.05)).join("")}${[0,1,2].map(i=>cell("ang",i,0.1)).join("")}</tr>`}).join("");
+  $("tbody").querySelectorAll("input").forEach(inp=>inp.addEventListener("input",()=>{
+    const [k,f,i]=inp.id.split("-");const v=parseFloat(inp.value);
+    if(isFinite(v)&&v>0){cfg[k][f][+i]=v;save();buildSegs();calc()}
+  }));
+  $("od").value=od;
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify({cfg,od}))}catch(e){}}
+const gap=(M,T,deg)=>{const r=deg*Math.PI/180;return (M-od)*Math.cos(r)+T*Math.sin(r)};
+const f2=x=>x.toFixed(2);
+
+function calc(){
+  const M=parseFloat($("m").value);
+  const ok=isFinite(M)&&M>0;$("merr").hidden=ok;
+  const c=cfg[state.inst],T=c.thk[state.thk],A=c.ang[state.arch];
+  if(!ok){["corr","rng"].forEach(i=>$(i).textContent="–");$("g").innerHTML='–<small>mm</small>';return}
+  const G=gap(M,T,A);
+  let lo=Infinity,hi=-Infinity;for(const t of c.thk)for(const a of c.ang){const g=gap(M,t,a);lo=Math.min(lo,g);hi=Math.max(hi,g)}
+  $("g").innerHTML=f2(G)+'<small>mm</small>';
+  $("corr").textContent=(G-M>=0?"+":"")+f2(G-M)+" mm";
+  $("ang").textContent=A+"°";
+  $("thk").textContent=T+" mm";
+  $("rng").textContent=f2(lo)+"–"+f2(hi)+" mm";
+  const r=A*Math.PI/180;
+  $("formula").textContent=(od?`(${M} − ${od})`:M)+` × cos ${A}° + ${T} × sin ${A}° = ${f2((M-od)*Math.cos(r))} + ${f2(T*Math.sin(r))} = ${f2(G)} mm`;
+  draw(M,T,A,G);
+}
+
+function draw(M,T,A,G){
+  const r=A*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
+  const P=(u,h)=>[u*c-h*s,u*s+h*c];
+  const uEnd=M+16,barW=Math.max(5,T*1.6),barD=Math.max(10,T*3.2);
+  const ymax=uEnd*s+5.5,ymin=-T-barD-6;
+  const xmin=-4,xmax=uEnd*c+2;
+  const W=560,pad=36,sc=Math.min((W-2*pad)/(xmax-xmin),210/(ymax-ymin));
+  const H=Math.round((ymax-ymin)*sc+40);
+  const X=x=>pad+(x-xmin)*sc,Y=y=>20+(ymax-y)*sc;
+  const pt=([x,y])=>`${X(x).toFixed(1)},${Y(y).toFixed(1)}`;
+  const band=(a,b,h0,h1)=>[P(a,h0),P(b,h0),P(b,h1),P(a,h1)].map(pt).join(" ");
+  const seam=P(M,-T),barR=P(M+barW,-T),tap=0.12*barD;
+  const bar=[seam,barR,[barR[0]-tap,barR[1]-barD],[seam[0]+tap,seam[1]-barD]].map(pt).join(" ");
+  const md=P(M/2,4.2);
+  const yG=ymin+2.5;
+  $("svg").setAttribute("viewBox",`0 0 ${W} ${H}`);
+  $("svg").innerHTML=`
+  <polygon points="${band(0,uEnd,0,-T)}" fill="var(--wood)" stroke="var(--wood-edge)" stroke-width="1"/>
+  <polygon points="${bar}" fill="var(--bar)" stroke="var(--wood-edge)" stroke-width="1"/>
+  <polygon points="${band(M-10,M,-T,-T-0.3)}" fill="var(--brass)"/>
+  <polygon points="${band(M-9,M-1,-T-0.3,-T-2.3)}" fill="var(--magnet)"/>
+  <polygon points="${band(M-10,M,0,0.8)}" fill="var(--plastic)"/>
+  <polygon points="${band(M-9,M-1,0.8,2.8)}" fill="var(--magnet)"/>
+  <line x1="${X(P(0,0)[0])}" y1="${Y(P(0,0)[1])}" x2="${X(P(0,0)[0])}" y2="${Y(yG)+4}" stroke="var(--dim)" stroke-dasharray="3 3"/>
+  <line x1="${X(seam[0])}" y1="${Y(seam[1])}" x2="${X(seam[0])}" y2="${Y(yG)+4}" stroke="var(--dim)" stroke-dasharray="3 3"/>
+  <line x1="${X(0)}" y1="${Y(yG)}" x2="${X(G)}" y2="${Y(yG)}" stroke="var(--dim)" stroke-width="1.5"/>
+  <path d="M${X(0)} ${Y(yG)-5}v10M${X(G)} ${Y(yG)-5}v10" stroke="var(--dim)" stroke-width="1.5"/>
+  <text class="dimt" x="${(X(0)+X(G))/2}" y="${Y(yG)+16}" text-anchor="middle">true gap ${f2(G)} mm</text>
+  <line x1="${pt(P(0,4)).split(",")[0]}" y1="${pt(P(0,4)).split(",")[1]}" x2="${pt(P(M,4)).split(",")[0]}" y2="${pt(P(M,4)).split(",")[1]}" stroke="var(--accent)" stroke-width="1.5"/>
+  <path d="M${pt(P(0,2.6))}L${pt(P(0,5.4))}M${pt(P(M,2.6))}L${pt(P(M,5.4))}" stroke="var(--accent)" stroke-width="1.5"/>
+  <text x="${X(md[0])}" y="${Y(md[1])-6}" text-anchor="middle" style="fill:var(--accent);font-family:var(--f-num);font-weight:500">M ${M} mm</text>
+  <text x="${X(0)-4}" y="${Y(0)+16}" text-anchor="end">f-hole</text>
+  <text x="${X(barR[0])+6}" y="${Y(barR[1]-barD/2)}">bass bar</text>
+  <text x="${X(P(uEnd,0)[0])}" y="${Y(P(uEnd,0)[1])-6}" text-anchor="end">top, ${T} mm, ${A}°</text>`;
+}
+
+$("m").addEventListener("input",calc);
+$("od").addEventListener("input",()=>{const v=parseFloat($("od").value);od=isFinite(v)?v:0;save();calc()});
+$("reset").addEventListener("click",()=>{cfg=JSON.parse(JSON.stringify(DEFAULTS));od=0;save();buildTable();buildSegs();calc()});
+$("form").addEventListener("submit",e=>e.preventDefault());
+buildSegs();buildTable();calc();
+</script>
+</body>
+</html>
