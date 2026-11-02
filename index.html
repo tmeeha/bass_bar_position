@@ -103,7 +103,7 @@ button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
       </div>
       <div class="field">
         <label class="lbl" for="m">Reading M, along the surface</label>
-        <div class="mrow"><input id="m" type="number" inputmode="decimal" step="0.1" min="0" value="17.0"><span>mm</span></div>
+        <div class="mrow"><input id="m" type="number" inputmode="decimal" step="0.1" min="0" value="20.0"><span>mm</span></div>
         <p class="err" id="merr" hidden>Enter a reading above 0 mm.</p>
         <p class="hint" id="mhint">Example value shown. Replace it with your measurement.</p>
       </div>
@@ -124,6 +124,7 @@ button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
       </div>
       <div class="formula" id="formula">–</div>
       <div class="fig"><svg id="svg" viewBox="0 0 560 260" role="img" aria-label="Cross-section of the plate at the mensur showing the magnets, the reading M and the corrected gap"></svg></div>
+      <p class="hint" id="figcap"></p>
     </section>
   </div>
 
@@ -139,21 +140,25 @@ button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
       <label for="od">Top disc overhang minus bottom disc overhang <input id="od" type="number" step="0.1" value="0"> mm</label>
       <button type="button" id="reset">Reset to defaults</button>
     </div>
-    <p class="note">Thicknesses in mm, angles in degrees. Angles are the local slope between the f-hole and the bass bar, which is steeper than the average arch slope by about 1.35 on curtate cycloid cross-arches (Playfair, CASJ 2003; Mottola, Savart Journal 2011). Violin: your 11–15 mm underside rise over a 55 mm run. Bass: 32–45 mm outside arch height, assuming about 175 mm of run. Thicknesses are your island estimates: violin 2.5–4 mm, viola 2.8–4.3 mm, cello 3.5–5 mm, bass 6–9 mm. Changes are kept in this browser only.</p>
+    <p class="note">Thicknesses in mm, angles in degrees. Angles are the slope of the top at the bass bar, where the magnets cross the plate. Defaults come from a curtate cycloid cross-arch at the mensur (Playfair, CASJ 2003; Mottola, Savart Journal 2011), measured from the channel to the centre line: violin 58 mm with 11/13/15 mm arch height, viola 68 mm with 12.5/15/17.5, cello 125 mm with 22/26/30, bass 190 mm with 32/38.5/45. The slope at the bar is lower than the average slope from the f-hole to the bar, because the arch flattens toward the centre. Thicknesses are your island estimates: violin 2.5–4 mm, viola 2.8–4.3 mm, cello 3.5–5 mm, bass 6–9 mm. The drawing shapes the top as a half curtate cycloid, x = a·t − b·sin t, y = b − b·cos t with a = l/π and b = h/2 (Mottola 2011), sized for each instrument and arch class and placed so its slope at the bass bar equals the class angle. Changes are kept in this browser only.</p>
   </details>
 </div>
 
 <script>
 const DEFAULTS={
-  violin:{name:"Violin",thk:[2.5,3.0,4.0],ang:[15,18,21]},
-  viola:{name:"Viola",thk:[2.8,3.25,4.3],ang:[16,18,20]},
-  cello:{name:"Cello",thk:[3.5,4.25,5.0],ang:[13,15,17]},
-  bass:{name:"Bass",thk:[6.0,7.5,9.0],ang:[11,13.5,16]}
+  violin:{name:"Violin",thk:[2.5,3.0,4.0],ang:[11.5,13,14]},
+  viola:{name:"Viola",thk:[2.8,3.25,4.3],ang:[11,12.5,13.5]},
+  cello:{name:"Cello",thk:[3.5,4.25,5.0],ang:[9.5,10.5,11.5]},
+  bass:{name:"Bass",thk:[6.0,7.5,9.0],ang:[9.5,10.5,11.5]}
 };
+// Half cross-arch at the mensur as a half curtate cycloid (Mottola 2011, eqs. 3-4; Playfair 2003):
+// l = channel to centre line, h = arch height per class. The default angles are this curve's
+// slope at the bass bar's outer edge (violin 22, viola 25, cello 40, bass 62 mm from centre).
+const ARCHDIM={violin:{l:58,h:[11,13,15]},viola:{l:68,h:[12.5,15,17.5]},cello:{l:125,h:[22,26,30]},bass:{l:190,h:[32,38.5,45]}};
 // Example readings per instrument, shown until the user types their own.
-const EXAMPLE={violin:17,viola:19,cello:30,bass:55};
+const EXAMPLE={violin:20,viola:23,cello:35,bass:65};
 let mEdited=false;
-const KEY="bbgap-v2";
+const KEY="bbgap-v3"; // v3: angles changed to the slope at the bass bar
 let cfg=JSON.parse(JSON.stringify(DEFAULTS)),od=0;
 const okArr=a=>Array.isArray(a)&&a.length===3&&a.every(v=>typeof v==="number"&&isFinite(v)&&v>0);
 try{const s=JSON.parse(localStorage.getItem(KEY)||"null");
@@ -198,7 +203,7 @@ function calc(){
   const M=parseFloat($("m").value);
   const ok=isFinite(M)&&M>0;$("merr").hidden=ok;
   const c=cfg[state.inst],T=c.thk[state.thk],A=c.ang[state.arch];
-  if(!ok){["corr","ang","thk","rng","formula"].forEach(i=>$(i).textContent="–");$("g").innerHTML='–<small>mm</small>';$("svg").innerHTML="";return}
+  if(!ok){["corr","ang","thk","rng","formula","figcap"].forEach(i=>$(i).textContent="–");$("g").innerHTML='–<small>mm</small>';$("svg").innerHTML="";return}
   const G=gap(M,T,A);
   let lo=Infinity,hi=-Infinity;for(const t of c.thk)for(const a of c.ang){const g=gap(M,t,a);lo=Math.min(lo,g);hi=Math.max(hi,g)}
   $("g").innerHTML=f2(G)+'<small>mm</small>';
@@ -212,48 +217,83 @@ function calc(){
 }
 
 function draw(M,T,A,G){
-  const r=A*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
-  const P=(u,h)=>[u*c-h*s,u*s+h*c];
+  const r=A*Math.PI/180,deg=t=>t*180/Math.PI;
   const Mb=M-od; // bottom disc edge = bass bar edge, in surface coordinates
-  const uEnd=Math.max(M,G)+16,barW=Math.max(5,T*1.6),barD=Math.max(10,T*3.2);
-  const ymax=uEnd*s+17,ymin=Math.min(-T*c-4,Mb*s-(T+barD)*c-4);
-  const xmin=-4,xmax=uEnd*c+2;
-  const W=560,pad=36,sc=Math.min((W-2*pad)/(xmax-xmin),300/(ymax-ymin));
-  const H=Math.round((ymax-ymin)*sc+40);
-  const X=x=>pad+(x-xmin)*sc,Y=y=>20+(ymax-y)*sc;
+  const barW=Math.max(5,T*1.6),barD=Math.max(10,T*3.2);
+  // Tabulate the half curtate cycloid with arc length s and slope angle phi.
+  const {l}=ARCHDIM[state.inst],hA=ARCHDIM[state.inst].h[state.arch],a=l/Math.PI,b=hA/2,N=1500;
+  const tx=[],ty=[],ts=[],tp=[];
+  for(let i=0;i<=N;i++){const t=Math.PI*i/N;tx.push(a*t-b*Math.sin(t));ty.push(b-b*Math.cos(t));
+    tp.push(Math.atan2(b*Math.sin(t),a-b*Math.cos(t)));ts.push(i?ts[i-1]+Math.hypot(tx[i]-tx[i-1],ty[i]-ty[i-1]):0)}
+  const S=ts[N];
+  // Place the bass bar where the slope equals the class angle, on the inner side of the steepest point.
+  let iMax=0;for(let i=1;i<=N;i++)if(tp[i]>tp[iMax])iMax=i;
+  let iA=iMax;for(let i=iMax;i<=N;i++){if(tp[i]<=r){iA=i;break}}
+  const u0=Mb+T*Math.tan(r)/2,sF=ts[iA]-u0; // sF: arc length from the plate edge to the f-hole edge
+  const look=s0=>{if(s0<=0)return [s0,0,0];if(s0>=S)return [l+s0-S,hA,0];
+    let lo=0,hi=N;while(hi-lo>1){const m=(lo+hi)>>1;if(ts[m]<=s0)lo=m;else hi=m}
+    const f=(s0-ts[lo])/(ts[hi]-ts[lo]);return [tx[lo]+f*(tx[hi]-tx[lo]),ty[lo]+f*(ty[hi]-ty[lo]),tp[lo]+f*(tp[hi]-tp[lo])]};
+  const C=u=>{const q=look(u+sF);return [q[0],q[1]]},th=u=>look(u+sF)[2];
+  const P=(u,h)=>{const [x,y]=C(u),t=th(u);return [x-h*Math.sin(t),y+h*Math.cos(t)]};
+  // Rigid part (disc, magnet) resting flat on the curve, centred at surface position uc.
+  const L=(uc,du,h)=>{const [x,y]=C(uc),t=th(uc);return [x+du*Math.cos(t)-h*Math.sin(t),y+du*Math.sin(t)+h*Math.cos(t)]};
+  const rect=(uc,w,h0,h1)=>[L(uc,-w/2,h0),L(uc,w/2,h0),L(uc,w/2,h1),L(uc,-w/2,h1)];
+  const span=(u1,u2,h,n=40)=>Array.from({length:n+1},(_,i)=>P(u1+(u2-u1)*i/n,h));
+  const uEnd=S-sF; // centre line
+  const plate=[...span(0,uEnd,0,80),...span(uEnd,0,-T,80)];
+  // Wing outboard of the f-hole (about 7 mm wide), shown faded.
+  const fW=7,wA=Math.min(-sF,-fW-12),wB=-fW;
+  const wing=[...span(wA,wB,0,30),...span(wB,wA,-T,30)];
+  const barPts=[...span(Mb,Mb+barW,-T,8)];
+  const archH=barW*0.5,side=barD-archH;
+  for(let i=0;i<=16;i++){const t=Math.PI*i/16;barPts.push(P(Mb+barW/2+(barW/2)*Math.cos(t),-T-side-archH*Math.sin(t)))}
+  const discB=rect(Mb-6,12,-T,-T-0.8),magB=rect(Mb-6,8,-T-0.8,-T-2.8);
+  const discT=rect(M-6,12,0,0.8),magT=rect(M-6,8,0.8,2.8);
+  // Point on the top surface directly above the bass bar edge.
+  const seam=P(Mb,-T);let lo=Mb-T-5,hi=Mb+T+5;
+  for(let i=0;i<50;i++){const m=(lo+hi)/2;if(C(m)[0]<seam[0])lo=m;else hi=m}
+  const uQ=(lo+hi)/2,Q=C(uQ);
+  // Dimension offsets scale with the drawing so they look the same for every instrument.
+  const o1=l*0.075,o2=l*0.16,tk=l*0.022;
+  const all=[...plate,...wing,...barPts,...span(0,uQ,o2+tk,4)];
+  const xs=all.map(p=>p[0]),ys=all.map(p=>p[1]);
+  const xmin=Math.min(...xs),xmax=Math.max(...xs),ymin=Math.min(...ys),ymax=Math.max(...ys);
+  const W=560,pl=20,pr=20,pt0=30,pb=34;
+  const sc=Math.min((W-pl-pr)/(xmax-xmin),320/(ymax-ymin));
+  const H=Math.round((ymax-ymin)*sc+pt0+pb);
+  const X=x=>pl+(x-xmin)*sc,Y=y=>pt0+(ymax-y)*sc;
   const pt=([x,y])=>`${X(x).toFixed(1)},${Y(y).toFixed(1)}`;
-  const band=(a,b,h0,h1)=>[P(a,h0),P(b,h0),P(b,h1),P(a,h1)].map(pt).join(" ");
-  const seam=P(Mb,-T),Q=P(G,0);
-  // Bass bar section in plate coordinates: straight sides along the plate normal, rounded free end.
-  const archH=barW*0.5,side=barD-archH,barPts=[[Mb,-T],[Mb+barW,-T]];
-  for(let i=0;i<=16;i++){const t=Math.PI*i/16;barPts.push([Mb+barW/2+(barW/2)*Math.cos(t),-T-side-archH*Math.sin(t)])}
-  const bar=barPts.map(([u,h])=>pt(P(u,h))).join(" ");
-  const barLbl=P(Mb+barW,-T-barD/2);
-  // Label set along the slope, nudged a few px off the line it names.
-  const lab=(u,h,txt,cls,style="")=>{const [x,y]=P(u,h),sx=X(x)-5*s,sy=Y(y)-5*c;
-    return `<text class="${cls}" x="${sx.toFixed(1)}" y="${sy.toFixed(1)}" text-anchor="middle" transform="rotate(${-A} ${sx.toFixed(1)} ${sy.toFixed(1)})" style="${style}">${txt}</text>`};
+  const poly=pts=>pts.map(pt).join(" ");
+  const line=pts=>"M"+pts.map(pt).join("L");
+  // Label set along the local slope, nudged a few px off the line it names.
+  const lab=(u,h,txt,cls,style="",off=-5,anchor="middle")=>{const [x,y]=P(u,h),t=th(u),
+      sx=(X(x)+off*Math.sin(t)).toFixed(1),sy=(Y(y)+off*Math.cos(t)).toFixed(1);
+    return `<text class="${cls}" x="${sx}" y="${sy}" text-anchor="${anchor}" transform="rotate(${(-deg(t)).toFixed(2)} ${sx} ${sy})" style="${style}">${txt}</text>`};
+  const dim=(u1,h,col)=>`<path d="${line([P(0,0.5),P(0,h+tk)])}${line([P(u1,u1===uQ?0:2.8),P(u1,h+tk)])}" stroke="${col}" stroke-dasharray="3 3" fill="none"/>
+  <path d="${line(span(0,u1,h))}" stroke="${col}" stroke-width="1.5" fill="none"/>
+  <path d="${line([P(0,h-tk),P(0,h+tk)])}${line([P(u1,h-tk),P(u1,h+tk)])}" stroke="${col}" stroke-width="1.5"/>`;
+  const barLbl=P(Mb+barW,-T-barD/2),gap=P(-fW/2,-T),cl=C(uEnd);
   $("svg").setAttribute("viewBox",`0 0 ${W} ${H}`);
   $("svg").innerHTML=`
-  <polygon points="${band(0,uEnd,0,-T)}" fill="var(--wood)" stroke="var(--wood-edge)" stroke-width="1"/>
-  <polygon points="${bar}" fill="var(--bar)" stroke="var(--wood-edge)" stroke-width="1"/>
-  <polygon points="${band(Mb-14,Mb,-T,-T-0.8)}" fill="var(--plastic)"/>
-  <polygon points="${band(Mb-11,Mb-3,-T-0.8,-T-2.8)}" fill="var(--magnet)"/>
-  <polygon points="${band(M-14,M,0,0.8)}" fill="var(--plastic)"/>
-  <polygon points="${band(M-11,M-3,0.8,2.8)}" fill="var(--magnet)"/>
+  <polygon points="${poly(wing)}" fill="var(--wood)" stroke="var(--wood-edge)" stroke-width="1" opacity=".5"/>
+  <polygon points="${poly(plate)}" fill="var(--wood)" stroke="var(--wood-edge)" stroke-width="1"/>
+  <path d="M${X(cl[0]).toFixed(1)} ${(Y(cl[1])-o1*sc).toFixed(1)}V${(Y(ymin)+6).toFixed(1)}" stroke="var(--muted)" stroke-dasharray="8 3 2 3" opacity=".7"/>
+  <polygon points="${poly(barPts)}" fill="var(--bar)" stroke="var(--wood-edge)" stroke-width="1"/>
+  <polygon points="${poly(discB)}" fill="var(--plastic)"/>
+  <polygon points="${poly(magB)}" fill="var(--magnet)"/>
+  <polygon points="${poly(discT)}" fill="var(--plastic)"/>
+  <polygon points="${poly(magT)}" fill="var(--magnet)"/>
   <path d="M${pt(seam)}L${pt(Q)}" stroke="var(--dim)" stroke-width="1.2" stroke-dasharray="3 3"/>
-  <path d="M${pt(P(0,0.5))}L${pt(P(0,14))}M${pt(P(G,0))}L${pt(P(G,14))}" stroke="var(--dim)" stroke-dasharray="3 3"/>
-  <path d="M${pt(P(0,13))}L${pt(P(G,13))}" stroke="var(--dim)" stroke-width="1.5"/>
-  <path d="M${pt(P(0,11.6))}L${pt(P(0,14.4))}M${pt(P(G,11.6))}L${pt(P(G,14.4))}" stroke="var(--dim)" stroke-width="1.5"/>
+  ${dim(uQ,o2,"var(--dim)")}
   <circle cx="${X(Q[0])}" cy="${Y(Q[1])}" r="2.5" fill="var(--dim)"/>
-  ${lab(G/2,13,`corrected ${f2(G)} mm`,"dimt")}
-  <path d="M${pt(P(0,0.5))}L${pt(P(0,7))}M${pt(P(M,2.8))}L${pt(P(M,7))}" stroke="var(--accent)" stroke-dasharray="2 3"/>
-  <path d="M${pt(P(0,6))}L${pt(P(M,6))}" stroke="var(--accent)" stroke-width="1.5"/>
-  <path d="M${pt(P(0,4.6))}L${pt(P(0,7.4))}M${pt(P(M,4.6))}L${pt(P(M,7.4))}" stroke="var(--accent)" stroke-width="1.5"/>
-  ${lab(M/2,6,`M ${M} mm`,"","fill:var(--accent);font-family:var(--f-num);font-weight:500")}
-  <text x="${X(0)-4}" y="${Y(0)+16}" text-anchor="end">f-hole</text>
-  <text x="${X(barLbl[0])+6}" y="${Y(barLbl[1])}">bass bar</text>
-  ${(()=>{const [x,y]=P(uEnd-1,-T),sx=(X(x)+14*s).toFixed(1),sy=(Y(y)+14*c).toFixed(1);
-    return `<text x="${sx}" y="${sy}" text-anchor="end" transform="rotate(${-A} ${sx} ${sy})">top, ${T} mm, ${A}°</text>`})()}`;
+  ${lab(uQ/2,o2,`corrected ${f2(G)} mm`,"dimt")}
+  ${dim(M,o1,"var(--accent)")}
+  ${lab(M/2,o1,`M ${M} mm`,"","fill:var(--accent);font-family:var(--f-num);font-weight:500")}
+  <text x="${X(gap[0]).toFixed(1)}" y="${(Y(gap[1])+18).toFixed(1)}" text-anchor="middle">f-hole</text>
+  <text x="${(X(barLbl[0])+6).toFixed(1)}" y="${Y(barLbl[1]).toFixed(1)}">bass bar</text>
+  <text x="${(X(cl[0])-6).toFixed(1)}" y="${(Y(cl[1])-o1*sc+4).toFixed(1)}" text-anchor="end">centre</text>
+`;
+  $("figcap").textContent=`Half cross-arch, f-hole to centre line, to scale. Top ${T} mm thick, arch ${hA} mm high over ${l} mm, slope ${A}° at the bass bar.`;
 }
 
 $("m").addEventListener("input",()=>{mEdited=true;$("mhint").hidden=true;calc()});
