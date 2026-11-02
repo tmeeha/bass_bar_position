@@ -84,7 +84,7 @@ button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
 <div class="wrap">
   <header>
     <h1>Bass bar gap calculator</h1>
-    <p>Corrects the magnet reading (f-hole inner edge to the top disc's edge, measured along the surface at the mensur) to the true horizontal gap to the bass bar's outer edge.</p>
+    <p>Corrects the magnet reading (f-hole inner edge to the top disc's edge, measured along the surface at the mensur) to the distance along the top surface from the f-hole edge to the point directly above the bass bar's outer edge.</p>
   </header>
 
   <div class="grid">
@@ -112,7 +112,7 @@ button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
     <section class="panel" aria-live="polite">
       <div class="result">
         <div>
-          <div class="lbl">True horizontal gap</div>
+          <div class="lbl">Corrected gap, on the top surface</div>
           <div class="big" id="g">–<small>mm</small></div>
         </div>
         <dl class="kv">
@@ -123,7 +123,7 @@ button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
         </dl>
       </div>
       <div class="formula" id="formula">–</div>
-      <div class="fig"><svg id="svg" viewBox="0 0 560 260" role="img" aria-label="Cross-section of the plate at the mensur showing the magnets, the reading M and the true gap"></svg></div>
+      <div class="fig"><svg id="svg" viewBox="0 0 560 260" role="img" aria-label="Cross-section of the plate at the mensur showing the magnets, the reading M and the corrected gap"></svg></div>
     </section>
   </div>
 
@@ -186,7 +186,9 @@ function buildTable(){
   $("od").value=od;
 }
 function save(){try{localStorage.setItem(KEY,JSON.stringify({cfg,od}))}catch(e){}}
-const gap=(M,T,deg)=>{const r=deg*Math.PI/180;return (M-od)*Math.cos(r)+T*Math.sin(r)};
+// Bottom disc edge sits on the bass bar edge, T below the surface along the plate normal.
+// The surface point straight above it lies T*tan(angle) further uphill along the top.
+const gap=(M,T,deg)=>(M-od)+T*Math.tan(deg*Math.PI/180);
 const f2=x=>x.toFixed(2);
 
 function calc(){
@@ -202,43 +204,48 @@ function calc(){
   $("thk").textContent=T+" mm";
   $("rng").textContent=f2(lo)+"–"+f2(hi)+" mm";
   const r=A*Math.PI/180;
-  $("formula").textContent=(od?`(${M} − ${od})`:M)+` × cos ${A}° + ${T} × sin ${A}° = ${f2((M-od)*Math.cos(r))} + ${f2(T*Math.sin(r))} = ${f2(G)} mm`;
+  $("formula").textContent=(od?`(${M} − ${od})`:M)+` + ${T} × tan ${A}° = ${f2(M-od)} + ${f2(T*Math.tan(r))} = ${f2(G)} mm`;
   draw(M,T,A,G);
 }
 
 function draw(M,T,A,G){
   const r=A*Math.PI/180,c=Math.cos(r),s=Math.sin(r);
   const P=(u,h)=>[u*c-h*s,u*s+h*c];
-  const uEnd=M+16,barW=Math.max(5,T*1.6),barD=Math.max(10,T*3.2);
-  const ymax=uEnd*s+5.5,ymin=-T-barD-6;
+  const Mb=M-od; // bottom disc edge = bass bar edge, in surface coordinates
+  const uEnd=Math.max(M,G)+16,barW=Math.max(5,T*1.6),barD=Math.max(10,T*3.2);
+  const ymax=uEnd*s+13,ymin=Math.min(-T*c-4,Mb*s-(T+barD)*c-4);
   const xmin=-4,xmax=uEnd*c+2;
   const W=560,pad=36,sc=Math.min((W-2*pad)/(xmax-xmin),210/(ymax-ymin));
   const H=Math.round((ymax-ymin)*sc+40);
   const X=x=>pad+(x-xmin)*sc,Y=y=>20+(ymax-y)*sc;
   const pt=([x,y])=>`${X(x).toFixed(1)},${Y(y).toFixed(1)}`;
   const band=(a,b,h0,h1)=>[P(a,h0),P(b,h0),P(b,h1),P(a,h1)].map(pt).join(" ");
-  const seam=P(M,-T),barR=P(M+barW,-T),tap=0.12*barD;
-  const bar=[seam,barR,[barR[0]-tap,barR[1]-barD],[seam[0]+tap,seam[1]-barD]].map(pt).join(" ");
-  const md=P(M/2,4.2);
-  const yG=ymin+2.5;
+  const seam=P(Mb,-T),Q=P(G,0);
+  // Bass bar section in plate coordinates: straight sides along the plate normal, rounded free end.
+  const archH=barW*0.5,side=barD-archH,barPts=[[Mb,-T],[Mb+barW,-T]];
+  for(let i=0;i<=16;i++){const t=Math.PI*i/16;barPts.push([Mb+barW/2+(barW/2)*Math.cos(t),-T-side-archH*Math.sin(t)])}
+  const bar=barPts.map(([u,h])=>pt(P(u,h))).join(" ");
+  const barLbl=P(Mb+barW,-T-barD/2);
+  const md=P(M/2,4.2),gd=P(G/2,10.2);
   $("svg").setAttribute("viewBox",`0 0 ${W} ${H}`);
   $("svg").innerHTML=`
   <polygon points="${band(0,uEnd,0,-T)}" fill="var(--wood)" stroke="var(--wood-edge)" stroke-width="1"/>
   <polygon points="${bar}" fill="var(--bar)" stroke="var(--wood-edge)" stroke-width="1"/>
-  <polygon points="${band(M-10,M,-T,-T-0.3)}" fill="var(--brass)"/>
-  <polygon points="${band(M-9,M-1,-T-0.3,-T-2.3)}" fill="var(--magnet)"/>
+  <polygon points="${band(Mb-10,Mb,-T,-T-0.3)}" fill="var(--brass)"/>
+  <polygon points="${band(Mb-9,Mb-1,-T-0.3,-T-2.3)}" fill="var(--magnet)"/>
   <polygon points="${band(M-10,M,0,0.8)}" fill="var(--plastic)"/>
   <polygon points="${band(M-9,M-1,0.8,2.8)}" fill="var(--magnet)"/>
-  <line x1="${X(P(0,0)[0])}" y1="${Y(P(0,0)[1])}" x2="${X(P(0,0)[0])}" y2="${Y(yG)+4}" stroke="var(--dim)" stroke-dasharray="3 3"/>
-  <line x1="${X(seam[0])}" y1="${Y(seam[1])}" x2="${X(seam[0])}" y2="${Y(yG)+4}" stroke="var(--dim)" stroke-dasharray="3 3"/>
-  <line x1="${X(0)}" y1="${Y(yG)}" x2="${X(G)}" y2="${Y(yG)}" stroke="var(--dim)" stroke-width="1.5"/>
-  <path d="M${X(0)} ${Y(yG)-5}v10M${X(G)} ${Y(yG)-5}v10" stroke="var(--dim)" stroke-width="1.5"/>
-  <text class="dimt" x="${(X(0)+X(G))/2}" y="${Y(yG)+16}" text-anchor="middle">true gap ${f2(G)} mm</text>
+  <path d="M${pt(seam)}L${pt(Q)}" stroke="var(--dim)" stroke-width="1.2" stroke-dasharray="3 3"/>
+  <path d="M${pt(P(0,0.5))}L${pt(P(0,11))}M${pt(P(G,0))}L${pt(P(G,11))}" stroke="var(--dim)" stroke-dasharray="3 3"/>
+  <path d="M${pt(P(0,10))}L${pt(P(G,10))}" stroke="var(--dim)" stroke-width="1.5"/>
+  <path d="M${pt(P(0,8.6))}L${pt(P(0,11.4))}M${pt(P(G,8.6))}L${pt(P(G,11.4))}" stroke="var(--dim)" stroke-width="1.5"/>
+  <circle cx="${X(Q[0])}" cy="${Y(Q[1])}" r="2.5" fill="var(--dim)"/>
+  <text class="dimt" x="${X(gd[0])}" y="${Y(gd[1])-6}" text-anchor="middle">corrected ${f2(G)} mm</text>
   <path d="M${pt(P(0,4))}L${pt(P(M,4))}" stroke="var(--accent)" stroke-width="1.5"/>
   <path d="M${pt(P(0,2.6))}L${pt(P(0,5.4))}M${pt(P(M,2.6))}L${pt(P(M,5.4))}" stroke="var(--accent)" stroke-width="1.5"/>
   <text x="${X(md[0])}" y="${Y(md[1])-6}" text-anchor="middle" style="fill:var(--accent);font-family:var(--f-num);font-weight:500">M ${M} mm</text>
   <text x="${X(0)-4}" y="${Y(0)+16}" text-anchor="end">f-hole</text>
-  <text x="${X(barR[0])+6}" y="${Y(barR[1]-barD/2)}">bass bar</text>
+  <text x="${X(barLbl[0])+6}" y="${Y(barLbl[1])}">bass bar</text>
   <text x="${X(P(uEnd,0)[0])}" y="${Y(P(uEnd,0)[1])-6}" text-anchor="end">top, ${T} mm, ${A}°</text>`;
 }
 
