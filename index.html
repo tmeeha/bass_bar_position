@@ -103,7 +103,7 @@ button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
       </div>
       <div class="field">
         <label class="lbl" for="m">Reading M, along the surface</label>
-        <div class="mrow"><input id="m" type="number" inputmode="decimal" step="0.1" min="0" value="20.0"><span>mm</span></div>
+        <div class="mrow"><input id="m" type="number" inputmode="decimal" step="0.1" min="0" value="18.0"><span>mm</span></div>
         <p class="err" id="merr" hidden>Enter a reading above 0 mm.</p>
         <p class="hint" id="mhint">Example value shown. Replace it with your measurement.</p>
       </div>
@@ -156,7 +156,7 @@ const DEFAULTS={
 // slope at the bass bar's outer edge (violin 22, viola 25, cello 40, bass 62 mm from centre).
 const ARCHDIM={violin:{l:58,h:[11,13,15]},viola:{l:68,h:[12.5,15,17.5]},cello:{l:125,h:[22,26,30]},bass:{l:190,h:[32,38.5,45]}};
 // Example readings per instrument, shown until the user types their own.
-const EXAMPLE={violin:20,viola:23,cello:35,bass:65};
+const EXAMPLE={violin:18,viola:21,cello:32,bass:59};
 let mEdited=false;
 const KEY="bbgap-v3"; // v3: angles changed to the slope at the bass bar
 let cfg=JSON.parse(JSON.stringify(DEFAULTS)),od=0;
