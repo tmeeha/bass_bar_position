@@ -12,18 +12,18 @@
 /* Layout: shop tool. Inputs left, corrected gap and cross-section right; class values tucked into a settings drawer. */
 :root{
   --bg:#EDEFEA;--surface:#F8F9F5;--ink:#1D231F;--muted:#5C6660;--line:#CBD2CA;
-  --accent:#8A4A10;--accent-soft:#F1E3D2;--on-accent:#FFFFFF;
+  --accent:#8A4A10;--accent-soft:#F1E3D2;--on-accent:#FFFFFF;--err:#B3261E;
   --wood:#E6D6B2;--wood-edge:#B59C6A;--bar:#CDB27E;--magnet:#56606B;--brass:#B48D27;--plastic:#7CA4C6;--dim:#2F5E7A;
   --f-ui:"Instrument Sans",ui-sans-serif,system-ui,sans-serif;
   --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
   --bg:#131714;--surface:#1B201C;--ink:#E5E9E4;--muted:#9BA59E;--line:#323A34;
-  --accent:#E59B52;--accent-soft:#3A2A1A;--on-accent:#1B1209;
+  --accent:#E59B52;--accent-soft:#3A2A1A;--on-accent:#1B1209;--err:#F2B8B5;
   --wood:#5E5034;--wood-edge:#8C7650;--bar:#7E6B47;--magnet:#9AA4AF;--brass:#D1AE4C;--plastic:#86B1D6;--dim:#8EC3E4;color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#131714;--surface:#1B201C;--ink:#E5E9E4;--muted:#9BA59E;--line:#323A34;
-  --accent:#E59B52;--accent-soft:#3A2A1A;--on-accent:#1B1209;
+  --accent:#E59B52;--accent-soft:#3A2A1A;--on-accent:#1B1209;--err:#F2B8B5;
   --wood:#5E5034;--wood-edge:#8C7650;--bar:#7E6B47;--magnet:#9AA4AF;--brass:#D1AE4C;--plastic:#86B1D6;--dim:#8EC3E4;color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.5;
@@ -49,7 +49,7 @@ header p{margin:4px 0 0;color:var(--muted);max-width:62ch}
 .mrow input:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
 .mrow span{color:var(--muted)}
 .hint{font-size:13px;color:var(--muted);margin:0}
-.err{font-size:13px;color:#B3261E;margin:0}
+.err{font-size:13px;color:var(--err);margin:0}
 .result{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 32px}
 .big{font-family:var(--f-num);font-size:52px;font-weight:500;line-height:1;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
 .big small{font-size:20px;color:var(--muted);margin-left:4px}
@@ -72,6 +72,7 @@ th{font-size:12px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase
 td input{font-family:var(--f-num);width:64px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 .srow{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;margin-top:14px}
 .srow label{display:flex;gap:8px;align-items:center;font-size:14px}
+.srow input{width:72px;font-family:var(--f-num);padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
 button{font:inherit;font-size:14px;padding:6px 14px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);cursor:pointer}
 button:hover{border-color:var(--muted)}
 button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
@@ -135,7 +136,7 @@ button:focus-visible{outline:2px solid var(--dim);outline-offset:1px}
       </table>
     </div>
     <div class="srow">
-      <label for="od">Top disc overhang minus bottom disc overhang <input id="od" type="number" step="0.1" value="0" style="width:72px;font-family:var(--f-num);padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)"> mm</label>
+      <label for="od">Top disc overhang minus bottom disc overhang <input id="od" type="number" step="0.1" value="0"> mm</label>
       <button type="button" id="reset">Reset to defaults</button>
     </div>
     <p class="note">Thicknesses in mm, angles in degrees. Angles are the local slope between the f-hole and the bass bar, which is steeper than the average arch slope by about 1.35 on curtate cycloid cross-arches (Playfair, CASJ 2003; Mottola, Savart Journal 2011). Violin: your 11–15 mm underside rise over a 55 mm run. Bass: 32–45 mm outside arch height, assuming about 175 mm of run. Thicknesses are your island estimates: violin 2.5–4 mm, viola 2.8–4.3 mm, cello 3.5–5 mm, bass 6–9 mm. Changes are kept in this browser only.</p>
@@ -151,7 +152,14 @@ const DEFAULTS={
 };
 const KEY="bbgap-v2";
 let cfg=JSON.parse(JSON.stringify(DEFAULTS)),od=0;
-try{const s=JSON.parse(localStorage.getItem(KEY)||"null");if(s&&s.cfg){cfg=s.cfg;od=+s.od||0}}catch(e){}
+const okArr=a=>Array.isArray(a)&&a.length===3&&a.every(v=>typeof v==="number"&&isFinite(v)&&v>0);
+try{const s=JSON.parse(localStorage.getItem(KEY)||"null");
+  if(s&&typeof s==="object"){
+    // Take saved values only where they are valid; fall back to defaults otherwise.
+    if(s.cfg&&typeof s.cfg==="object")for(const k of Object.keys(cfg)){const v=s.cfg[k];
+      if(v&&okArr(v.thk))cfg[k].thk=v.thk;
+      if(v&&okArr(v.ang))cfg[k].ang=v.ang}
+    const o=+s.od;od=isFinite(o)?o:0}}catch(e){}
 const state={inst:"violin",arch:1,thk:1};
 const $=id=>document.getElementById(id);
 const ARCH=["Low","Medium","High"],THK=["Thin","Medium","Thick"];
@@ -185,7 +193,7 @@ function calc(){
   const M=parseFloat($("m").value);
   const ok=isFinite(M)&&M>0;$("merr").hidden=ok;
   const c=cfg[state.inst],T=c.thk[state.thk],A=c.ang[state.arch];
-  if(!ok){["corr","rng"].forEach(i=>$(i).textContent="–");$("g").innerHTML='–<small>mm</small>';return}
+  if(!ok){["corr","ang","thk","rng","formula"].forEach(i=>$(i).textContent="–");$("g").innerHTML='–<small>mm</small>';$("svg").innerHTML="";return}
   const G=gap(M,T,A);
   let lo=Infinity,hi=-Infinity;for(const t of c.thk)for(const a of c.ang){const g=gap(M,t,a);lo=Math.min(lo,g);hi=Math.max(hi,g)}
   $("g").innerHTML=f2(G)+'<small>mm</small>';
@@ -226,7 +234,7 @@ function draw(M,T,A,G){
   <line x1="${X(0)}" y1="${Y(yG)}" x2="${X(G)}" y2="${Y(yG)}" stroke="var(--dim)" stroke-width="1.5"/>
   <path d="M${X(0)} ${Y(yG)-5}v10M${X(G)} ${Y(yG)-5}v10" stroke="var(--dim)" stroke-width="1.5"/>
   <text class="dimt" x="${(X(0)+X(G))/2}" y="${Y(yG)+16}" text-anchor="middle">true gap ${f2(G)} mm</text>
-  <line x1="${pt(P(0,4)).split(",")[0]}" y1="${pt(P(0,4)).split(",")[1]}" x2="${pt(P(M,4)).split(",")[0]}" y2="${pt(P(M,4)).split(",")[1]}" stroke="var(--accent)" stroke-width="1.5"/>
+  <path d="M${pt(P(0,4))}L${pt(P(M,4))}" stroke="var(--accent)" stroke-width="1.5"/>
   <path d="M${pt(P(0,2.6))}L${pt(P(0,5.4))}M${pt(P(M,2.6))}L${pt(P(M,5.4))}" stroke="var(--accent)" stroke-width="1.5"/>
   <text x="${X(md[0])}" y="${Y(md[1])-6}" text-anchor="middle" style="fill:var(--accent);font-family:var(--f-num);font-weight:500">M ${M} mm</text>
   <text x="${X(0)-4}" y="${Y(0)+16}" text-anchor="end">f-hole</text>
